@@ -1,41 +1,48 @@
-import express from "express";
-import logger from "morgan"; // outputs to console request info
-import cors from "cors";
-import { contactsRouter } from "./routes/api/contactsRouter.js";
-import { authRouter } from "./routes/api/authRouter.js";
+import bcrypt from "bcrypt";
 
-//% Time to time access to process.env not in all project. Maybe moving these rows from server.js to app.js may help (but it is not certain):
-// // require("dotenv").config();
-// import "dotenv/config"; // Method .config() looks for file .env, reads it and add to process.env keys with values.
+const saltRounds = 10;
+const myPlaintextPassword =
+  "YKn.T71XkiHCuL00V2llDx8rzs5d4564lx$12$w6WIy3Oi/usTqoFXSLe2kwM/sUOVoPDy";
+const someOtherPlaintextPassword = "not_bacon";
 
-export const app = express();
-
-// In package.json, depends of value (development or production) in variable ENV (aka NODE_ENV) will be showed full or short info
-// cross-env NODE_ENV=production nodemon server.js - will show full info
-const formatsLogger = app.get("env") === "development" ? "dev" : "short"; // read ENV and show full or short info
-
-//^ app.use([path], middleware);
-// .use((req, res, next) => {...}): add middleware for each request (PUT, DELETE, etc.)
-// .use('/api', (req, res, next) => {...}): add middleware for requests on routes starting with '/api' (/api/users, /api/products/123, etc)
-// .use((err, req, res, next) => {...}): add middleware for errors processing
-
-app.use(logger(formatsLogger)); // show full or short info in log
-app.use(cors());
-app.use(express.json()); // Checks if exist body in each request. If exist, it checks type by header "Content-Type". If Content-Type === "application/json, this middleware convert it from string to object (by JSON.parse())
-
-app.use("/api/contacts", contactsRouter); // use contactsRouter methods if request on "/api/contacts" route
-app.use("/api/auth", authRouter);
-
-app.use("/", (req, res, next) => {
-  res.status(404).json({ message: "Not found route" });
+//* To hash a password
+//# Technique 1 (generate a salt and hash on separate function calls):
+bcrypt.genSalt(saltRounds, function (err, salt) {
+  bcrypt.hash(myPlaintextPassword, salt, function (err, hash) {
+    // Store hash in your password DB.
+  });
 });
 
-// Route for errors (4 parameters)
-app.use((err, req, res, next) => {
-  //$ opt1
-  // res.status(500).json({ message: err.message });
+//# Technique 2 (auto-gen a salt and hash):
+bcrypt.hash(myPlaintextPassword, saltRounds, function (err, hash) {
+  // Store hash in your password DB.
+});
 
-  //$ opt2
-  const { status = 500, message = "Server error" } = err;
-  return res.status(status).json({ message });
+// Example
+const createHashPassword = async password => {
+  // Old technique:
+  const mySalt = await bcrypt.genSalt(10);
+  const result1 = await bcrypt.hash(password, mySalt);
+
+  // New technique:
+  const result2 = await bcrypt.hash(password, 10);
+
+  // Check received password from user
+  const compareResult1 = await bcrypt.compare(password, result2);
+  console.log("compareResult1:::", compareResult1); // true
+
+  const compareResult2 = await bcrypt.compare("111", result2);
+  console.log("compareResult2:::", compareResult2); // false
+};
+
+createHashPassword("1234567");
+
+//* To check a password
+// Load hash from your password DB.
+const hashFromDb = "aslkdfjlkasdjflkajsudflkj";
+bcrypt.compare(myPlaintextPassword, hashFromDb, function (err, result) {
+  // result == true
+});
+bcrypt.compare(someOtherPlaintextPassword, hashFromDb, function (err, result) {
+  // result == false
 });
